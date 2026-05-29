@@ -48,12 +48,24 @@
     .success { color: #16803c; font-size: 13px; min-height: 18px; }
     @media (max-width: 900px) { .dashboard, .category-grid { grid-template-columns: repeat(2, 1fr); } .form-row { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 600px) { .dashboard, .category-grid, .form-row { grid-template-columns: 1fr; } header { position: static; } }
+  
+    /* Footer */
+        footer {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2.5rem;
+            border-top: 1px solid var(--card-border);
+            color: var(--text-dim);
+            font-size: 0.82rem;
+        }
+        footer span { color: var(--accent2); }
   </style>
 </head>
 <body>
   <div id="authPage" class="auth-wrapper">
     <div class="auth-card">
-      <h1>Savings Tracker</h1>
+      <h1>Savings Monitoring</h1>
       <div class="subtitle">Login or create an account using Supabase.</div>
       <div class="auth-form">
         <input id="authEmail" type="email" placeholder="Email address" />
@@ -125,7 +137,7 @@
   </div>
 
 <script>
-const SUPABASE_URL = "https://usprytzfdxpvpfodpjfx.supabase.co";
+const SUPABASE_URL = "https://usprytzfdxpvpfdopjfx.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_RbpjzkmpL3nOGj2Zf_OkBQ_CrngbpLv";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -539,5 +551,10 @@ function render() {
 
 checkSession();
 </script>
+
+    <footer>
+    <p>Designed & built for <span>Vernielyn Germono</span> · 2026</p>
+    </footer>
+    
 </body>
 </html>
