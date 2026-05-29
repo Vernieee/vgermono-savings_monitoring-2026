@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Savings Monitoring System - Supabase Auth</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; background: #f4f6fb; color: #222; }
+    header { background: white; padding: 18px 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); position: sticky; top: 0; z-index: 10; }
+    h1 { margin: 0; font-size: 24px; }
+    .subtitle { margin-top: 4px; color: #666; }
+    .container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+    .section, .auth-card { background: white; border-radius: 14px; padding: 18px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+    .auth-wrapper { max-width: 430px; margin: 60px auto; padding: 0 16px; }
+    .section-title, .top-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    h2, h3 { margin: 0; }
+    .form-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 12px; }
+    .auth-form { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 14px; }
+    input, select, button { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; font-size: 14px; }
+    button { cursor: pointer; background: #2f6fed; color: white; border: none; font-weight: bold; }
+    button.secondary { background: #6c757d; }
+    button.danger { background: #d9534f; }
+    button.small { padding: 7px 10px; font-size: 12px; width: auto; }
+    .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .metric { background: #eef2ff; border-radius: 12px; padding: 14px; }
+    .metric-label { color: #555; font-size: 13px; margin-bottom: 6px; }
+    .metric-value { font-size: 22px; font-weight: bold; }
+    .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .category-card { border: 1px solid #e1e4ea; border-radius: 12px; padding: 14px; background: #fff; }
+    .category-header { display: flex; justify-content: space-between; gap: 10px; align-items: start; margin-bottom: 10px; }
+    .category-name { font-size: 17px; font-weight: bold; }
+    .category-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; font-size: 14px; }
+    .detail-box { background: #f7f8fc; padding: 8px; border-radius: 8px; }
+    .progress-wrap { background: #ddd; border-radius: 20px; overflow: hidden; height: 18px; margin-top: 10px; }
+    .progress { background: #2f6fed; height: 18px; color: white; font-size: 12px; text-align: center; min-width: 30px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+    th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; font-size: 14px; }
+    th { background: #f7f8fc; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tab { background: #eef2ff; color: #222; border: 1px solid #d8def7; width: auto; }
+    .tab.active { background: #2f6fed; color: white; }
+    .empty { text-align: center; color: #777; padding: 20px; background: #f7f8fc; border-radius: 10px; }
+    .hidden { display: none; }
+    .note { background: #fff7db; border: 1px solid #f1dd99; padding: 10px; border-radius: 8px; font-size: 13px; color: #5d4a00; margin-top: 12px; }
+    .error { color: #d9534f; font-size: 13px; min-height: 18px; white-space: pre-wrap; }
+    .success { color: #16803c; font-size: 13px; min-height: 18px; }
+    @media (max-width: 900px) { .dashboard, .category-grid { grid-template-columns: repeat(2, 1fr); } .form-row { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .dashboard, .category-grid, .form-row { grid-template-columns: 1fr; } header { position: static; } }
+  </style>
+</head>
+<body>
+  <div id="authPage" class="auth-wrapper">
+    <div class="auth-card">
+      <h1>Savings Tracker</h1>
+      <div class="subtitle">Login or create an account using Supabase.</div>
+      <div class="auth-form">
+        <input id="authEmail" type="email" placeholder="Email address" />
+        <input id="authPassword" type="password" placeholder="Password" />
+        <button onclick="login()">Login</button>
+        <button class="secondary" onclick="signUp()">Create Account</button>
+        <div class="success" id="authSuccess"></div>
+        <div class="error" id="authError"></div>
+      </div>
+      <div class="note">
+        If you see “Failed to fetch”, host this HTML file using GitHub Pages, Netlify, or Vercel instead of opening it as a local Android download.
+      </div>
+    </div>
+  </div>
+
+  <div id="appPage" class="hidden">
+    <header>
+      <div class="top-bar">
+        <div>
+          <h1>Savings Monitoring System</h1>
+          <div class="subtitle" id="userInfo">Your savings data is stored in Supabase database.</div>
+        </div>
+        <button class="danger small" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="section">
+        <div class="section-title"><h2>Monitoring Dashboard</h2></div>
+        <div class="dashboard">
+          <div class="metric"><div class="metric-label">Total Target</div><div class="metric-value" id="totalTarget">₱0.00</div></div>
+          <div class="metric"><div class="metric-label">Total Savings</div><div class="metric-value" id="totalSavings">₱0.00</div></div>
+          <div class="metric"><div class="metric-label">Total Deductions</div><div class="metric-value" id="totalDeductions">₱0.00</div></div>
+          <div class="metric"><div class="metric-label">Current Balance</div><div class="metric-value" id="totalBalance">₱0.00</div></div>
+        </div>
+        <div id="categoryMonitoring" class="category-grid"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><h2>Add Category / Transaction</h2></div>
+        <h3>Add Savings Category</h3>
+        <div class="form-row">
+          <input id="categoryName" placeholder="Category Name e.g. Emergency Fund" />
+          <input id="targetAmount" type="number" placeholder="Target Amount" />
+          <button onclick="addCategory()">Add Category</button>
+        </div>
+
+        <br />
+        <h3>Add Savings Checklist or Deduction</h3>
+        <div class="form-row">
+          <select id="transactionCategory"></select>
+          <select id="transactionType">
+            <option value="Savings">Savings Checklist</option>
+            <option value="Deduction">Deduction</option>
+          </select>
+          <input id="transactionDesc" placeholder="Description e.g. May Savings" />
+          <input id="transactionAmount" type="number" placeholder="Amount" />
+          <input id="transactionDate" type="date" />
+          <button onclick="addTransaction()">Add Transaction</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><h2>Breakdown Area</h2></div>
+        <div class="tabs" id="categoryTabs"></div>
+        <div id="breakdown"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const SUPABASE_URL = "https://usprytzfdxpvpfdopjfx.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_RbpjzkmpL3nOGj2Zf_OkBQ_CrngbpLv";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let categories = [];
+let selectedCategoryId = null;
+
+function peso(amount) {
+  return "₱" + Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function displayError(id, error) {
+  let msg = "";
+  if (!navigator.onLine) {
+    msg = "You appear to be offline. Please connect to the internet and try again.";
+  } else if (error && error.message === "Failed to fetch") {
+    msg = "Failed to fetch. The app cannot reach Supabase.\n\nCommon fixes:\n1. Make sure the full publishable/anon key is correct.\n2. Run the SQL setup first.\n3. Host this HTML online instead of opening it as a local Android download.";
+  } else {
+    msg = error?.message || String(error || "");
+  }
+  document.getElementById(id).innerText = msg;
+}
+
+function showError(id, msg) { document.getElementById(id).innerText = msg || ""; }
+function showSuccess(id, msg) { document.getElementById(id).innerText = msg || ""; }
+
+async function checkSession() {
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    if (data.session) {
+      currentUser = data.session.user;
+      showApp();
+      await loadData();
+    } else {
+      showAuth();
+    }
+  } catch (error) {
+    showAuth();
+    displayError("authError", error);
+  }
+}
+
+function showAuth() {
+  document.getElementById("authPage").classList.remove("hidden");
+  document.getElementById("appPage").classList.add("hidden");
+}
+
+function showApp() {
+  document.getElementById("authPage").classList.add("hidden");
+  document.getElementById("appPage").classList.remove("hidden");
+  document.getElementById("userInfo").innerText = "Logged in as: " + currentUser.email;
+}
+
+async function signUp() {
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  showError("authError", "");
+  showSuccess("authSuccess", "");
+
+  if (!email || !password) return showError("authError", "Please enter email and password.");
+  if (password.length < 6) return showError("authError", "Password must be at least 6 characters.");
+
+  try {
+    const { error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) throw error;
+    showSuccess("authSuccess", "Account created. If email confirmation is enabled, check your email first, then login.");
+  } catch (error) {
+    displayError("authError", error);
+  }
+}
+
+async function login() {
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  showError("authError", "");
+  showSuccess("authSuccess", "");
+
+  if (!email || !password) return showError("authError", "Please enter email and password.");
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    currentUser = data.user;
+    showApp();
+    await loadData();
+  } catch (error) {
+    displayError("authError", error);
+  }
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  categories = [];
+  selectedCategoryId = null;
+  showAuth();
+}
+
+async function loadData() {
+  try {
+    const { data: categoryRows, error: catError } = await supabaseClient
+      .from("categories")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (catError) throw catError;
+
+    const { data: transactionRows, error: tranError } = await supabaseClient
+      .from("transactions")
+      .select("*")
+      .order("transaction_date", { ascending: true });
+    if (tranError) throw tranError;
+
+    categories = (categoryRows || []).map(category => ({
+      id: category.id,
+      name: category.name,
+      target: Number(category.target_amount),
+      transactions: (transactionRows || [])
+        .filter(t => t.category_id === category.id)
+        .map(t => ({
+          id: t.id,
+          type: t.type,
+          desc: t.description,
+          amount: Number(t.amount),
+          date: t.transaction_date,
+          completed: t.is_completed
+        }))
+    }));
+
+    selectedCategoryId = categories.length ? (selectedCategoryId || categories[0].id) : null;
+    render();
+  } catch (error) {
+    alert("Error loading data: " + (error.message || error));
+  }
+}
+
+async function addCategory() {
+  const name = document.getElementById("categoryName").value.trim();
+  const target = Number(document.getElementById("targetAmount").value);
+  if (!name || target <= 0) return alert("Please enter a valid category name and target amount.");
+
+  const { data, error } = await supabaseClient
+    .from("categories")
+    .insert({ user_id: currentUser.id, name: name, target_amount: target })
+    .select()
+    .single();
+
+  if (error) return alert("Error adding category: " + error.message);
+
+  document.getElementById("categoryName").value = "";
+  document.getElementById("targetAmount").value = "";
+  selectedCategoryId = data.id;
+  await loadData();
+}
+
+async function deleteCategory(categoryId) {
+  if (!confirm("Delete this category and all its transactions?")) return;
+
+  const { error } = await supabaseClient
+    .from("categories")
+    .delete()
+    .eq("id", categoryId);
+
+  if (error) return alert("Error deleting category: " + error.message);
+
+  selectedCategoryId = null;
+  await loadData();
+}
+
+async function addTransaction() {
+  const categoryId = document.getElementById("transactionCategory").value;
+  const type = document.getElementById("transactionType").value;
+  const desc = document.getElementById("transactionDesc").value.trim();
+  const amount = Number(document.getElementById("transactionAmount").value);
+  const date = document.getElementById("transactionDate").value;
+
+  if (!categoryId) return alert("Please add or select a category first.");
+  if (!desc || amount <= 0 || !date) return alert("Please complete the transaction details.");
+
+  const category = categories.find(c => c.id === categoryId);
+  if (type === "Deduction" && amount > getBalance(category)) {
+    return alert("Deduction cannot exceed the current balance.");
+  }
+
+  const { error } = await supabaseClient
+    .from("transactions")
+    .insert({
+      category_id: categoryId,
+      user_id: currentUser.id,
+      type: type,
+      description: desc,
+      amount: amount,
+      transaction_date: date,
+      is_completed: type === "Savings" ? false : true
+    });
+
+  if (error) return alert("Error adding transaction: " + error.message);
+
+  selectedCategoryId = categoryId;
+  document.getElementById("transactionDesc").value = "";
+  document.getElementById("transactionAmount").value = "";
+  document.getElementById("transactionDate").value = "";
+
+  await loadData();
+}
+
+async function toggleChecklist(categoryId, transactionId) {
+  const category = categories.find(c => c.id === categoryId);
+  const transaction = category.transactions.find(t => t.id === transactionId);
+
+  const { error } = await supabaseClient
+    .from("transactions")
+    .update({ is_completed: !transaction.completed })
+    .eq("id", transactionId);
+
+  if (error) return alert("Error updating checklist: " + error.message);
+  await loadData();
+}
+
+async function deleteTransaction(categoryId, transactionId) {
+  const { error } = await supabaseClient
+    .from("transactions")
+    .delete()
+    .eq("id", transactionId);
+
+  if (error) return alert("Error deleting transaction: " + error.message);
+
+  selectedCategoryId = categoryId;
+  await loadData();
+}
+
+function getTotalSavings(category) {
+  return category.transactions
+    .filter(t => t.type === "Savings" && t.completed)
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function getPendingSavings(category) {
+  return category.transactions
+    .filter(t => t.type === "Savings" && !t.completed)
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function getTotalDeductions(category) {
+  return category.transactions
+    .filter(t => t.type === "Deduction")
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+function getBalance(category) {
+  return getTotalSavings(category) - getTotalDeductions(category);
+}
+
+function setSelectedCategory(categoryId) {
+  selectedCategoryId = categoryId;
+  render();
+}
+
+function renderCategoryOptions() {
+  const select = document.getElementById("transactionCategory");
+  select.innerHTML = "";
+
+  if (!categories.length) {
+    select.innerHTML = `<option value="">No category available</option>`;
+    return;
+  }
+
+  categories.forEach(c => {
+    select.innerHTML += `<option value="${c.id}" ${c.id === selectedCategoryId ? "selected" : ""}>${c.name}</option>`;
+  });
+}
+
+function renderDashboard() {
+  const totalTarget = categories.reduce((sum, c) => sum + c.target, 0);
+  const totalSavings = categories.reduce((sum, c) => sum + getTotalSavings(c), 0);
+  const totalDeductions = categories.reduce((sum, c) => sum + getTotalDeductions(c), 0);
+  const totalBalance = totalSavings - totalDeductions;
+
+  document.getElementById("totalTarget").innerText = peso(totalTarget);
+  document.getElementById("totalSavings").innerText = peso(totalSavings);
+  document.getElementById("totalDeductions").innerText = peso(totalDeductions);
+  document.getElementById("totalBalance").innerText = peso(totalBalance);
+
+  const container = document.getElementById("categoryMonitoring");
+  container.innerHTML = "";
+
+  if (!categories.length) {
+    container.innerHTML = `<div class="empty">No savings category yet. Add your first category below.</div>`;
+    return;
+  }
+
+  categories.forEach(category => {
+    const totalSavings = getTotalSavings(category);
+    const totalDeductions = getTotalDeductions(category);
+    const balance = getBalance(category);
+    const remaining = Math.max(category.target - balance, 0);
+    const progress = category.target > 0 ? Math.min((balance / category.target) * 100, 100) : 0;
+
+    container.innerHTML += `
+      <div class="category-card">
+        <div class="category-header">
+          <div>
+            <div class="category-name">${category.name}</div>
+            <small>${balance >= category.target ? "Completed" : "In Progress"}</small>
+          </div>
+          <button class="danger small" onclick="deleteCategory('${category.id}')">Delete</button>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress" style="width:${progress}%">${progress.toFixed(1)}%</div>
+        </div>
+
+        <div class="category-details">
+          <div class="detail-box">Target<br><b>${peso(category.target)}</b></div>
+          <div class="detail-box">Balance<br><b>${peso(balance)}</b></div>
+          <div class="detail-box">Savings<br><b>${peso(totalSavings)}</b></div>
+          <div class="detail-box">Deduction<br><b>${peso(totalDeductions)}</b></div>
+          <div class="detail-box">Remaining<br><b>${peso(remaining)}</b></div>
+          <div class="detail-box">Pending<br><b>${peso(getPendingSavings(category))}</b></div>
+        </div>
+
+        <br>
+        <button class="small" onclick="setSelectedCategory('${category.id}')">View Breakdown</button>
+      </div>
+    `;
+  });
+}
+
+function renderTabs() {
+  const tabs = document.getElementById("categoryTabs");
+  tabs.innerHTML = "";
+
+  categories.forEach(c => {
+    tabs.innerHTML += `
+      <button class="tab ${c.id === selectedCategoryId ? "active" : ""}" onclick="setSelectedCategory('${c.id}')">
+        ${c.name}
+      </button>
+    `;
+  });
+}
+
+function renderBreakdown() {
+  const container = document.getElementById("breakdown");
+
+  if (!categories.length) {
+    container.innerHTML = `<div class="empty">No breakdown available yet.</div>`;
+    return;
+  }
+
+  const category = categories.find(c => c.id === selectedCategoryId) || categories[0];
+  selectedCategoryId = category.id;
+
+  const totalSavings = getTotalSavings(category);
+  const totalDeductions = getTotalDeductions(category);
+  const balance = getBalance(category);
+  const remaining = Math.max(category.target - balance, 0);
+
+  container.innerHTML = `
+    <h3>${category.name} Breakdown</h3>
+    <p>
+      Target: <b>${peso(category.target)}</b> |
+      Total Savings: <b>${peso(totalSavings)}</b> |
+      Total Deductions: <b>${peso(totalDeductions)}</b> |
+      Balance: <b>${peso(balance)}</b> |
+      Remaining: <b>${peso(remaining)}</b>
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${category.transactions.length ? category.transactions.map(t => `
+          <tr>
+            <td>${t.date}</td>
+            <td>${t.type}</td>
+            <td>${t.desc}</td>
+            <td>${peso(t.amount)}</td>
+            <td>
+              ${t.type === "Savings"
+                ? `<input type="checkbox" ${t.completed ? "checked" : ""} onclick="toggleChecklist('${category.id}', '${t.id}')" /> ${t.completed ? "Completed" : "Pending"}`
+                : "Deducted"}
+            </td>
+            <td>
+              <button class="danger small" onclick="deleteTransaction('${category.id}', '${t.id}')">Delete</button>
+            </td>
+          </tr>
+        `).join("") : `
+          <tr>
+            <td colspan="6" class="empty">No transactions yet for this category.</td>
+          </tr>
+        `}
+      </tbody>
+    </table>
+  `;
+}
+
+function render() {
+  renderCategoryOptions();
+  renderDashboard();
+  renderTabs();
+  renderBreakdown();
+}
+
+checkSession();
+</script>
+</body>
+</html>
